@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useReducer } from "react";
 import Link from "next/link";
 import Carousel from "./Carousel";
 import { CardBody, CardContainer, CardItem } from "../../components/ui/3d-card";
@@ -37,24 +37,61 @@ const PRICE_RANGES = [
 
 const ITEMS_PER_PAGE = 6;
 
+interface State {
+  properties: Property[];
+  filteredProperties: Property[];
+  error: string | null;
+  loading: boolean;
+  selectedCity: string;
+  selectedPriceRange: { min: number; max: number } | null;
+  currentPage: number;
+}
+
+const initialState: State = {
+  properties: [],
+  filteredProperties: [],
+  error: null,
+  loading: true,
+  selectedCity: "",
+  selectedPriceRange: null,
+  currentPage: 1,
+};
+
+type Action =
+  | { type: "SET_PROPERTIES"; payload: Property[] }
+  | { type: "SET_ERROR"; payload: string | null }
+  | { type: "SET_LOADING"; payload: boolean }
+  | { type: "SET_CITY"; payload: string }
+  | { type: "SET_PRICE_RANGE"; payload: { min: number; max: number } | null }
+  | { type: "SET_CURRENT_PAGE"; payload: number };
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case "SET_PROPERTIES":
+      return { ...state, properties: action.payload, loading: false };
+    case "SET_ERROR":
+      return { ...state, error: action.payload, loading: false };
+    case "SET_LOADING":
+      return { ...state, loading: action.payload };
+    case "SET_CITY":
+      return { ...state, selectedCity: action.payload, currentPage: 1 };
+    case "SET_PRICE_RANGE":
+      return { ...state, selectedPriceRange: action.payload, currentPage: 1 };
+    case "SET_CURRENT_PAGE":
+      return { ...state, currentPage: action.payload };
+    default:
+      return state;
+  }
+}
+
 const PropertyList: React.FC = () => {
-  const [properties, setProperties] = useState<Property[]>([]);
-  const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [selectedCity, setSelectedCity] = useState<string>("");
-  const [selectedPriceRange, setSelectedPriceRange] = useState<{
-    min: number;
-    max: number;
-  } | null>(null);
-  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [state, dispatch] = useReducer(reducer, initialState);
 
   useEffect(() => {
     const fetchProperties = async (retryCount = 3, delay = 1000) => {
-      setLoading(true);
+      dispatch({ type: "SET_LOADING", payload: true });
       try {
         const response = await fetch("/api/PropertyListings");
-  
         const responseText = await response.text();
         if (!response.ok) {
           let errorMessage = "Failed to fetch properties";
@@ -66,80 +103,74 @@ const PropertyList: React.FC = () => {
           }
           throw new Error(errorMessage);
         }
-  
+
         const data = JSON.parse(responseText);
         if (Array.isArray(data.data)) {
-          setProperties(data.data);
+          dispatch({ type: "SET_PROPERTIES", payload: data.data });
         } else {
           throw new Error("Unexpected response format");
         }
       } catch (error) {
         if (error instanceof Error) {
-          if (error.message.includes("FUNCTION_INVOCATION_TIMEOUT") && retryCount > 0) {
+          if (
+            error.message.includes("FUNCTION_INVOCATION_TIMEOUT") &&
+            retryCount > 0
+          ) {
             console.warn("Retrying fetch due to timeout...");
-            setTimeout(() => fetchProperties(retryCount - 1, delay * 2), delay); // Exponential backoff
+            setTimeout(() => fetchProperties(retryCount - 1, delay * 2), delay);
           } else {
-            setError(error.message);
+            dispatch({ type: "SET_ERROR", payload: error.message });
           }
         } else {
-          setError("An unknown error occurred");
+          dispatch({ type: "SET_ERROR", payload: "An unknown error occurred" });
         }
-      } finally {
-        setLoading(false);
       }
     };
-  
+
     fetchProperties();
   }, []);
-  
-  
 
   useEffect(() => {
     const applyFilters = () => {
-      let filtered = properties;
+      let filtered = state.properties;
 
-      if (selectedCity) {
+      if (state.selectedCity) {
         filtered = filtered.filter(
-          (property) => property.location === selectedCity
+          (property) => property.location === state.selectedCity
         );
       }
 
-      if (selectedPriceRange) {
+      if (state.selectedPriceRange) {
         filtered = filtered.filter(
           (property) =>
-            property.price >= selectedPriceRange.min &&
-            property.price <= selectedPriceRange.max
+            property.price >= state.selectedPriceRange!.min &&
+            property.price <= state.selectedPriceRange!.max
         );
       }
 
-      setFilteredProperties(filtered);
-      setCurrentPage(1);
+      dispatch({ type: "SET_PROPERTIES", payload: filtered });
     };
 
     applyFilters();
-  }, [properties, selectedCity, selectedPriceRange]);
+  }, [state.properties, state.selectedCity, state.selectedPriceRange]);
 
-  const paginatedProperties = filteredProperties.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+  const paginatedProperties = state.filteredProperties.slice(
+    (state.currentPage - 1) * ITEMS_PER_PAGE,
+    state.currentPage * ITEMS_PER_PAGE
   );
 
-  const totalPages = Math.ceil(filteredProperties.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(state.filteredProperties.length / ITEMS_PER_PAGE);
 
   return (
     <div className="container mx-auto p-6 bg-gray-50 min-h-screen">
-      {/* <h1 className="text-4xl font-extrabold text-center text-gray-800 mb-8">
-        Property Listings
-      </h1> */}
-
-      {loading ? (
-       <div className="flex justify-center items-center min-h-screen bg-gray-100">
-       <div className="w-16 h-16 border-4 border-t-4 border-blue-500 border-solid rounded-full animate-spin relative">
-         <div className="absolute inset-0 border-4 border-t-4 border-transparent border-r-blue-600 border-solid rounded-full"></div>
-       </div>
-     </div>
-      ) : error ? (
-        <p className="text-center text-red-600 font-semibold">{error}</p>
+      {state.loading ? (
+        <div className="flex justify-center items-center min-h-screen bg-gray-100">
+          <div className="w-16 h-16 border-4 border-t-4 border-blue-500 border-solid rounded-full animate-spin relative">
+            <div className="absolute inset-0 border-4 border-t-4 border-transparent border-r-blue-600 border-solid rounded-full"></div>
+          </div>
+        </div>
+      ) : state.error ? (
+        <p className="text-center text-red-600 font-semibold">{state.error}</p>
       ) : (
         <>
           <Carousel />
@@ -158,7 +189,6 @@ const PropertyList: React.FC = () => {
           </div>
 
           <div className="mb-8 flex flex-col space-y-4 md:flex-row md:space-y-0 md:space-x-6 mt-2">
-            {/* City Selector */}
             <div className="flex items-center space-x-4">
               <label
                 htmlFor="city"
@@ -168,8 +198,10 @@ const PropertyList: React.FC = () => {
               </label>
               <select
                 id="city"
-                value={selectedCity}
-                onChange={(e) => setSelectedCity(e.target.value)}
+                value={state.selectedCity}
+                onChange={(e) =>
+                  dispatch({ type: "SET_CITY", payload: e.target.value })
+                }
                 className="p-3 border border-gray-300 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All Cities</option>
@@ -181,7 +213,6 @@ const PropertyList: React.FC = () => {
               </select>
             </div>
 
-            {/* Price Range Selector */}
             <div className="flex items-center space-x-4">
               <label
                 htmlFor="price-range"
@@ -192,19 +223,27 @@ const PropertyList: React.FC = () => {
               <select
                 id="price-range"
                 value={
-                  selectedPriceRange
-                    ? `${selectedPriceRange.min}-${selectedPriceRange.max}`
+                  state.selectedPriceRange
+                    ? `${state.selectedPriceRange.min}-${state.selectedPriceRange.max}`
                     : ""
                 }
                 onChange={(e) => {
-                  const [min, max] = e.target.value.split("-").map(Number);
-                  setSelectedPriceRange(min && max ? { min, max } : null);
+                  const [min, max] = e.target.value
+                    .split("-")
+                    .map(Number) as [number, number];
+                  dispatch({
+                    type: "SET_PRICE_RANGE",
+                    payload: min !== undefined && max !== undefined ? { min, max } : null,
+                  });
                 }}
                 className="p-3 border border-gray-300 rounded-lg shadow-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All Prices</option>
                 {PRICE_RANGES.map((range) => (
-                  <option key={range.label} value={`${range.min}-${range.max}`}>
+                  <option
+                    key={range.label}
+                    value={`${range.min}-${range.max}`}
+                  >
                     {range.label}
                   </option>
                 ))}
@@ -212,115 +251,50 @@ const PropertyList: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {paginatedProperties.length > 0 ? (
-              paginatedProperties.map((property) => (
-                <CardContainer className="inter-var" key={property._id}>
-                  <CardBody className="bg-gray-50 relative group/card dark:hover:shadow-2xl dark:hover:shadow-emerald-500/[0.1] dark:bg-black dark:border-white/[0.2] border-black/[0.1] w-auto  h-auto rounded-xl p-6 border">
-                    <CardItem
-                      translateZ="50"
-                      className="text-xl font-bold text-neutral-600 dark:text-white"
-                    >
-                      {property.title}
-                    </CardItem>
-                    <CardItem
-                      as="p"
-                      translateZ="60"
-                      className="text-neutral-500 text-sm max-w-sm mt-2 dark:text-neutral-300"
-                    >
-                      {property.description}
-                    </CardItem>
-                    <CardItem translateZ="100" className="w-full mt-4">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-5">
+            {paginatedProperties.map((property) => (
+              <Link key={property._id} href={`/property/${property._id}`}>
+                <CardContainer className="h-72">
+                  <CardBody>
+                    <CardItem>
                       <img
-                        src={
-                          property.images[0] ||
-                          "https://via.placeholder.com/300x200"
-                        }
+                        src={property.images[0]}
                         alt={property.title}
-                        className="h-60 w-full object-cover rounded-xl group-hover/card:shadow-xl"
+                        className="object-cover w-full h-40 rounded-lg mb-2"
                       />
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        {property.title}
+                      </h3>
+                      <p className="text-gray-700">
+                        {property.location}
+                      </p>
+                      <p className="text-blue-500 font-semibold">
+                        ₹{property.price} per night
+                      </p>
                     </CardItem>
-                    <div className="mt-4">
-                      <p className="text-gray-800 font-medium">
-                        <strong>Location:</strong> {property.location}
-                      </p>
-                      <p className="text-gray-800 font-medium">
-                        <strong>Price:</strong> ₹
-                        {property.price.toLocaleString()}
-                      </p>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {property.amenities.map((amenity, index) => (
-                          <span
-                            key={index}
-                            className="bg-gray-200 text-gray-800 text-xs font-medium px-3 py-1 rounded-full"
-                          >
-                            {amenity}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="flex justify-between items-center mt-6 cursor-pointer">
-                      <Link href={`/properties/${property._id}`}>
-                      <button
-                        type="button"
-                        className="px-4 py-2 rounded-xl text-xs font-normal dark:text-white hover:outline-1"
-                      >
-                        Book Now →
-                      </button>
-                    </Link>
-                      </div>
-                    </div>
                   </CardBody>
                 </CardContainer>
-              ))
-            ) : (
-              <p className="col-span-full text-center text-gray-600">
-                No properties available.
-              </p>
-            )}
+              </Link>
+            ))}
           </div>
 
-          <div className="flex justify-center mt-8">
-            <nav aria-label="Page navigation">
-              <ul className="flex space-x-2">
-                <li>
-                  <button
-                    onClick={() =>
-                      setCurrentPage((page) => Math.max(page - 1, 1))
-                    }
-                    disabled={currentPage === 1}
-                    className="px-4 py-2 bg-gray-200 text-gray-600 rounded-lg shadow-sm hover:bg-gray-300 disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
-                </li>
-                {Array.from({ length: totalPages }, (_, index) => (
-                  <li key={index}>
-                    <button
-                      onClick={() => setCurrentPage(index + 1)}
-                      className={`px-4 py-2 border rounded-lg ${
-                        currentPage === index + 1
-                          ? "bg-blue-600 text-white"
-                          : "bg-white text-gray-600"
-                      } hover:bg-blue-700 hover:text-white`}
-                    >
-                      {index + 1}
-                    </button>
-                  </li>
-                ))}
-                <li>
-                  <button
-                    onClick={() =>
-                      setCurrentPage((page) => Math.min(page + 1, totalPages))
-                    }
-                    disabled={currentPage === totalPages}
-                    className="px-4 py-2 bg-gray-200 text-gray-600 rounded-lg shadow-sm hover:bg-gray-300 disabled:opacity-50"
-                  >
-                    Next
-                  </button>
-                </li>
-              </ul>
-            </nav>
-          </div>
+          {totalPages > 1 && (
+            <div className="flex justify-center mt-6 space-x-2">
+              {Array.from({ length: totalPages }, (_, index) => (
+                <button
+                  key={index + 1}
+                  onClick={() => dispatch({ type: "SET_CURRENT_PAGE", payload: index + 1 })}
+                  className={`px-4 py-2 rounded-lg ${
+                    state.currentPage === index + 1
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-300 text-gray-700"
+                  }`}
+                >
+                  {index + 1}
+                </button>
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>
