@@ -50,7 +50,7 @@ const PropertyList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   useEffect(() => {
-    const fetchProperties = async () => {
+    const fetchProperties = async (retryCount = 3) => {
       setLoading(true);
       try {
         const response = await fetch("/api/PropertyListings");
@@ -72,7 +72,10 @@ const PropertyList: React.FC = () => {
           throw new Error("Unexpected response format");
         }
       } catch (error) {
-        if (error instanceof Error) {
+        if (error instanceof Error && error.message.includes("FUNCTION_INVOCATION_TIMEOUT") && retryCount > 0) {
+          console.warn("Retrying fetch due to timeout...");
+          fetchProperties(retryCount - 1);
+        } else if (error instanceof Error) {
           setError(error.message);
         } else {
           setError("An unknown error occurred");
@@ -84,6 +87,7 @@ const PropertyList: React.FC = () => {
   
     fetchProperties();
   }, []);
+  
   
   
 
