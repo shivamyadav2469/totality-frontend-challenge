@@ -50,19 +50,21 @@ const PropertyList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   useEffect(() => {
-    const fetchProperties = async (retryCount = 3) => {
+    const fetchProperties = async (retryCount = 3, delay = 1000) => {
       setLoading(true);
       try {
         const response = await fetch("/api/PropertyListings");
   
         const responseText = await response.text();
         if (!response.ok) {
+          let errorMessage = "Failed to fetch properties";
           try {
             const errorData = JSON.parse(responseText);
-            throw new Error(errorData.error || "Failed to fetch properties");
-          } catch {
-            throw new Error("Failed to fetch properties: " + responseText);
+            errorMessage = errorData.error || errorMessage;
+          } catch (jsonError) {
+            errorMessage += ": " + responseText;
           }
+          throw new Error(errorMessage);
         }
   
         const data = JSON.parse(responseText);
@@ -72,11 +74,13 @@ const PropertyList: React.FC = () => {
           throw new Error("Unexpected response format");
         }
       } catch (error) {
-        if (error instanceof Error && error.message.includes("FUNCTION_INVOCATION_TIMEOUT") && retryCount > 0) {
-          console.warn("Retrying fetch due to timeout...");
-          fetchProperties(retryCount - 1);
-        } else if (error instanceof Error) {
-          setError(error.message);
+        if (error instanceof Error) {
+          if (error.message.includes("FUNCTION_INVOCATION_TIMEOUT") && retryCount > 0) {
+            console.warn("Retrying fetch due to timeout...");
+            setTimeout(() => fetchProperties(retryCount - 1, delay * 2), delay); // Exponential backoff
+          } else {
+            setError(error.message);
+          }
         } else {
           setError("An unknown error occurred");
         }
@@ -87,7 +91,6 @@ const PropertyList: React.FC = () => {
   
     fetchProperties();
   }, []);
-  
   
   
 
