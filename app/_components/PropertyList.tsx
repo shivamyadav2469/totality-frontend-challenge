@@ -51,36 +51,39 @@ const PropertyList: React.FC = () => {
 
   useEffect(() => {
   // Example of optimizing a slow API call with async/await
-  const fetchProperties = async () => {
+  const fetchProperties = async (retries = 3) => {
     setLoading(true);
     try {
       const response = await fetch("/api/PropertyListings");
   
       if (!response.ok) {
-        // If the response is not ok, handle the error
         const errorText = await response.text();
         throw new Error(errorText || "Failed to fetch properties");
       }
   
-      // Try to parse JSON
       const data = await response.json();
   
-      // Validate that the data is an array
       if (Array.isArray(data.data)) {
         setProperties(data.data);
       } else {
         throw new Error("Unexpected response format");
       }
     } catch (error) {
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "An unexpected error occurred";
-      setError(errorMessage);
+      if (retries > 0) {
+        // Retry the request
+        setTimeout(() => fetchProperties(retries - 1), 2000); // Retry after 2 seconds
+      } else {
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred";
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
   };
+  
   
 
     fetchProperties();
