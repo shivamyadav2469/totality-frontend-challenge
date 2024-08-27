@@ -50,33 +50,33 @@ const PropertyList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   useEffect(() => {
-    const fetchProperties = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch("/api/PropertyListings");
+  // Example of optimizing a slow API call with async/await
+const fetchProperties = async () => {
+  setLoading(true);
+  try {
+    const response = await fetch("/api/PropertyListings");
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to fetch properties");
-        }
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Failed to fetch properties");
+    }
 
-        const data = await response.json();
-
-        if (Array.isArray(data.data)) {
-          setProperties(data.data);
-        } else {
-          throw new Error("Unexpected response format");
-        }
-      } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred";
-        setError(errorMessage);
-      } finally {
-        setLoading(false);
-      }
-    };
+    const data = await response.json();
+    if (Array.isArray(data.data)) {
+      setProperties(data.data);
+    } else {
+      throw new Error("Unexpected response format");
+    }
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "An unexpected error occurred";
+    setError(errorMessage);
+  } finally {
+    setLoading(false);
+  }
+};
 
     fetchProperties();
   }, []);
