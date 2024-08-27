@@ -49,51 +49,37 @@ const PropertyList: React.FC = () => {
   } | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
-  const fetchWithRetry = async (url: string | URL | Request, options: RequestInit | undefined, retries = 3) => {
-    for (let i = 0; i < retries; i++) {
-        try {
-            const response = await fetch(url, options);
-            if (!response.ok) {
-                throw new Error(`Error: ${response.statusText}`);
-            }
-            return response.json();
-        } catch (error) {
-            if (i === retries - 1) {
-                throw error;
-            }
-        }
-    }
-};
-
-useEffect(() => {
-  const fetchProperties = async () => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
-
+  useEffect(() => {
+    const fetchProperties = async () => {
+      setLoading(true);
       try {
-          const data = await fetchWithRetry("/api/PropertyListings", {
-              signal: controller.signal,
-          });
+        const response = await fetch("/api/PropertyListings");
 
-          if (Array.isArray(data.data)) {
-              setProperties(data.data);
-          } else {
-              throw new Error("Unexpected response format");
-          }
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to fetch properties");
+        }
+
+        const data = await response.json();
+
+        if (Array.isArray(data.data)) {
+          setProperties(data.data);
+        } else {
+          throw new Error("Unexpected response format");
+        }
       } catch (error: unknown) {
-          const errorMessage =
-              error instanceof Error
-                  ? error.message
-                  : "An unexpected error occurred";
-          setError(errorMessage);
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "An unexpected error occurred";
+        setError(errorMessage);
       } finally {
-          setLoading(false);
-          clearTimeout(timeoutId);
+        setLoading(false);
       }
-  };
+    };
 
-  fetchProperties();
-}, []);
+    fetchProperties();
+  }, []);
 
   useEffect(() => {
     const applyFilters = () => {
@@ -129,12 +115,16 @@ useEffect(() => {
 
   return (
     <div className="container mx-auto p-6 bg-gray-50 min-h-screen">
+      {/* <h1 className="text-4xl font-extrabold text-center text-gray-800 mb-8">
+        Property Listings
+      </h1> */}
+
       {loading ? (
-        <div className="flex justify-center items-center min-h-screen bg-gray-100">
-          <div className="w-16 h-16 border-4 border-t-4 border-blue-500 border-solid rounded-full animate-spin relative">
-            <div className="absolute inset-0 border-4 border-t-4 border-transparent border-r-blue-600 border-solid rounded-full"></div>
-          </div>
-        </div>
+       <div className="flex justify-center items-center min-h-screen bg-gray-100">
+       <div className="w-16 h-16 border-4 border-t-4 border-blue-500 border-solid rounded-full animate-spin relative">
+         <div className="absolute inset-0 border-4 border-t-4 border-transparent border-r-blue-600 border-solid rounded-full"></div>
+       </div>
+     </div>
       ) : error ? (
         <p className="text-center text-red-600 font-semibold">{error}</p>
       ) : (
@@ -245,48 +235,79 @@ useEffect(() => {
                         <strong>Price:</strong> ₹
                         {property.price.toLocaleString()}
                       </p>
-                      <p className="text-gray-800 font-medium">
-                        <strong>Bedrooms:</strong> {property.bedrooms}
-                      </p>
-                      <p className="text-gray-800 font-medium">
-                        <strong>Amenities:</strong>{" "}
-                        {property.amenities.join(", ")}
-                      </p>
-                    </div>
-                    <Link
-                      href={`/property/${property._id}`}
-                      className="inline-block mt-4 text-sm font-medium text-blue-500 hover:underline"
-                    >
-                      View Details
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {property.amenities.map((amenity, index) => (
+                          <span
+                            key={index}
+                            className="bg-gray-200 text-gray-800 text-xs font-medium px-3 py-1 rounded-full"
+                          >
+                            {amenity}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex justify-between items-center mt-6 cursor-pointer">
+                      <Link href={`/properties/${property._id}`}>
+                      <button
+                        type="button"
+                        className="px-4 py-2 rounded-xl text-xs font-normal dark:text-white hover:outline-1"
+                      >
+                        Book Now →
+                      </button>
                     </Link>
+                      </div>
+                    </div>
                   </CardBody>
                 </CardContainer>
               ))
             ) : (
-              <p className="text-center text-gray-600">
-                No properties found. Please adjust your filters and try again.
+              <p className="col-span-full text-center text-gray-600">
+                No properties available.
               </p>
             )}
           </div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-8 flex justify-center">
-              {Array.from({ length: totalPages }).map((_, index) => (
-                <button
-                  key={index + 1}
-                  onClick={() => setCurrentPage(index + 1)}
-                  className={`px-4 py-2 mx-1 text-sm font-medium ${
-                    currentPage === index + 1
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200 text-gray-700"
-                  } rounded-lg focus:outline-none hover:bg-blue-400`}
-                >
-                  {index + 1}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex justify-center mt-8">
+            <nav aria-label="Page navigation">
+              <ul className="flex space-x-2">
+                <li>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((page) => Math.max(page - 1, 1))
+                    }
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 bg-gray-200 text-gray-600 rounded-lg shadow-sm hover:bg-gray-300 disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                </li>
+                {Array.from({ length: totalPages }, (_, index) => (
+                  <li key={index}>
+                    <button
+                      onClick={() => setCurrentPage(index + 1)}
+                      className={`px-4 py-2 border rounded-lg ${
+                        currentPage === index + 1
+                          ? "bg-blue-600 text-white"
+                          : "bg-white text-gray-600"
+                      } hover:bg-blue-700 hover:text-white`}
+                    >
+                      {index + 1}
+                    </button>
+                  </li>
+                ))}
+                <li>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((page) => Math.min(page + 1, totalPages))
+                    }
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 bg-gray-200 text-gray-600 rounded-lg shadow-sm hover:bg-gray-300 disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </li>
+              </ul>
+            </nav>
+          </div>
         </>
       )}
     </div>

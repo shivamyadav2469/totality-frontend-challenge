@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
-import { getproperty, getProperty, createProperty } from '../../../_actions/propertyaction';
+
+import { getproperty, getPropertyById, createProperty } from '../../../_actions/propertyaction';
 
 export async function GET(request) {
   try {
     const { id } = request.nextUrl.searchParams;
 
     if (id) {
-      const property = await getProperty(id);
+      const property = await getPropertyById(id);
       return NextResponse.json(property);
     } else {
       const properties = await getproperty();
@@ -28,5 +29,3 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Failed to create property' }, { status: 500 });
   }
 }
-
-
