@@ -49,44 +49,51 @@ const PropertyList: React.FC = () => {
   } | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
 
-  useEffect(() => {
-    const fetchProperties = async () => {
+  const fetchWithRetry = async (url: string | URL | Request, options: RequestInit | undefined, retries = 3) => {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                throw new Error(`Error: ${response.statusText}`);
+            }
+            return response.json();
+        } catch (error) {
+            if (i === retries - 1) {
+                throw error;
+            }
+        }
+    }
+};
+
+useEffect(() => {
+  const fetchProperties = async () => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // Set timeout to 10 seconds
-      setLoading(true);
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
 
       try {
-        const response = await fetch("/api/PropertyListings", {
-          signal: controller.signal,
-        });
+          const data = await fetchWithRetry("/api/PropertyListings", {
+              signal: controller.signal,
+          });
 
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Failed to fetch properties");
-        }
-
-        const data = await response.json();
-
-        if (Array.isArray(data.data)) {
-          setProperties(data.data);
-        } else {
-          throw new Error("Unexpected response format");
-        }
+          if (Array.isArray(data.data)) {
+              setProperties(data.data);
+          } else {
+              throw new Error("Unexpected response format");
+          }
       } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred";
-        setError(errorMessage);
+          const errorMessage =
+              error instanceof Error
+                  ? error.message
+                  : "An unexpected error occurred";
+          setError(errorMessage);
       } finally {
-        setLoading(false);
+          setLoading(false);
+          clearTimeout(timeoutId);
       }
-    };
+  };
 
-    fetchProperties();
-  }, []);
+  fetchProperties();
+}, []);
 
   useEffect(() => {
     const applyFilters = () => {
