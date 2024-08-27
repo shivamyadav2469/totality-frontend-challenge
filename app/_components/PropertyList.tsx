@@ -70,19 +70,17 @@ const PropertyList: React.FC = () => {
       }
     } catch (error) {
       if (retries > 0) {
-        // Retry the request
+        console.error(`Retrying fetch... Attempts left: ${retries}`);
         setTimeout(() => fetchProperties(retries - 1), 2000); // Retry after 2 seconds
       } else {
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred";
-        setError(errorMessage);
+        console.error("Max retries reached. Error:", error);
+        setError(error.message || "An unexpected error occurred");
       }
     } finally {
       setLoading(false);
     }
   };
+  
   
   
 
