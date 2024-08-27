@@ -54,40 +54,35 @@ const PropertyList: React.FC = () => {
   const fetchProperties = async (retries = 3) => {
     setLoading(true);
     try {
-      const response = await fetch("/api/PropertyListings");
-  
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || "Failed to fetch properties");
-      }
-  
-      const data = await response.json();
-  
-      if (Array.isArray(data.data)) {
-        setProperties(data.data);
-      } else {
-        throw new Error("Unexpected response format");
-      }
-    } catch (error) {
-      if (error instanceof Error) {
-        // TypeScript now knows 'error' is an instance of Error
-        if (retries > 0) {
-          console.error(`Retrying fetch... Attempts left: ${retries}`);
-          setTimeout(() => fetchProperties(retries - 1), 2000); // Retry after 2 seconds
-        } else {
-          console.error("Max retries reached. Error:", error.message);
-          setError(error.message || "An unexpected error occurred");
+        const response = await fetch("/api/PropertyListings");
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || "Failed to fetch properties");
         }
-      } else {
-        // Handle the case where 'error' is not an instance of Error
-        console.error("An unexpected error occurred:", error);
-        setError("An unexpected error occurred");
-      }
+
+        const data = await response.json();
+
+        if (Array.isArray(data.data)) {
+            setProperties(data.data);
+        } else {
+            throw new Error("Unexpected response format");
+        }
+    } catch (error) {
+        if (retries > 0) {
+            console.error(`Retrying fetch... Attempts left: ${retries}`);
+            setTimeout(() => fetchProperties(retries - 1), 2000); // Retry after 2 seconds
+        } else {
+            const errorMessage = (error as Error).message || "An unexpected error occurred";
+            console.error("Max retries reached. Error:", errorMessage);
+            setError(errorMessage);
+        }
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
-  
+};
+
+
   
   
   
