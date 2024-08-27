@@ -69,17 +69,25 @@ const PropertyList: React.FC = () => {
         throw new Error("Unexpected response format");
       }
     } catch (error) {
-      if (retries > 0) {
-        console.error(`Retrying fetch... Attempts left: ${retries}`);
-        setTimeout(() => fetchProperties(retries - 1), 2000); // Retry after 2 seconds
+      if (error instanceof Error) {
+        // TypeScript now knows 'error' is an instance of Error
+        if (retries > 0) {
+          console.error(`Retrying fetch... Attempts left: ${retries}`);
+          setTimeout(() => fetchProperties(retries - 1), 2000); // Retry after 2 seconds
+        } else {
+          console.error("Max retries reached. Error:", error.message);
+          setError(error.message || "An unexpected error occurred");
+        }
       } else {
-        console.error("Max retries reached. Error:", error);
-        setError(error.message || "An unexpected error occurred");
+        // Handle the case where 'error' is not an instance of Error
+        console.error("An unexpected error occurred:", error);
+        setError("An unexpected error occurred");
       }
     } finally {
       setLoading(false);
     }
   };
+  
   
   
   
