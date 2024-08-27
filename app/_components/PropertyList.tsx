@@ -54,35 +54,39 @@ const PropertyList: React.FC = () => {
   const fetchProperties = async (retries = 3) => {
     setLoading(true);
     try {
-        const response = await fetch("/api/PropertyListings");
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(errorText || "Failed to fetch properties");
-        }
-
-        const data = await response.json();
-
-        if (Array.isArray(data.data)) {
-            setProperties(data.data);
+      const response = await fetch("/api/PropertyListings");
+  
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to fetch properties");
+      }
+  
+      const data = await response.json();
+  
+      if (Array.isArray(data.data)) {
+        setProperties(data.data);
+      } else {
+        throw new Error("Unexpected response format");
+      }
+    } catch (error: unknown) {
+      if (retries > 0) {
+        console.error(`Retrying fetch... Attempts left: ${retries}`);
+        setTimeout(() => fetchProperties(retries - 1), 2000); // Retry after 2 seconds
+      } else {
+        if (error instanceof Error) {
+          console.error("Max retries reached. Error:", error.message);
+          setError(error.message || "An unexpected error occurred");
         } else {
-            throw new Error("Unexpected response format");
+          console.error("Max retries reached. An unknown error occurred");
+          setError("An unexpected error occurred");
         }
-    } catch (error) {
-        if (retries > 0) {
-            console.error(`Retrying fetch... Attempts left: ${retries}`);
-            setTimeout(() => fetchProperties(retries - 1), 2000); // Retry after 2 seconds
-        } else {
-            const errorMessage = (error as Error).message || "An unexpected error occurred";
-            console.error("Max retries reached. Error:", errorMessage);
-            setError(errorMessage);
-        }
+      }
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-};
-
-
+  };
+  
+  
   
   
   

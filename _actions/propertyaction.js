@@ -4,7 +4,7 @@ import connectDB from '../config/database';
 export async function getproperty() {
   try {
     await connectDB();
-    const data = await propertyModel.find().exec(); // Efficient query
+    const data = await propertyModel.find().lean().exec(); // Use .lean() for performance
     return { data };
   } catch (error) {
     console.error("Error fetching properties:", error);
